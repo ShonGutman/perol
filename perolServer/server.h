@@ -16,15 +16,19 @@ using std::endl;
 using std::string;
 using std::thread;
 
+#define UDP_PORT 8200
+
 class server
 {
 public:
-	server() = default;
+	server(ba::io_service& io_service);
 	~server() = default;
 
 	void run();
 
 private:
+	udp::socket _socketServer;
 
 	void startListening();
+	void handleNewClient(udp::endpoint remoteEndpoint);
 };

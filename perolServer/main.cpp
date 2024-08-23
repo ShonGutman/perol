@@ -3,8 +3,11 @@
 
 int main()
 {
+    cout << "Initializing io service" << endl;
+    ba::io_service io_service;
+
     cout << "Initializing server" << endl;
-    server p2pServer;
+    server p2pServer(io_service);
 
     cout << "Starting running server" << endl;
     cout << "--------------------" << endl;
