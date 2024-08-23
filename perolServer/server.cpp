@@ -55,5 +55,14 @@ void server::startListening()
 
 void server::handleNewClient(udp::endpoint remoteEndpoint)
 {
-	cout << "new client!" << endl;
+	cout << "New client accepted with ip " << remoteEndpoint.address() << " and port " << remoteEndpoint.port() << endl;
+
+	sendMsg("Welcome!\n", remoteEndpoint);
+}
+
+void server::sendMsg(const string& msg, udp::endpoint& remoteEndpoint)
+{
+	bs::error_code ignored_error;
+	_socketServer.send_to(ba::buffer(msg),
+	remoteEndpoint, 0, ignored_error);
 }
