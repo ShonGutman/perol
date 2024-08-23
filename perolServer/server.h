@@ -32,4 +32,5 @@ private:
 	void startListening();
 	void handleNewClient(udp::endpoint remoteEndpoint);
 	void sendMsg(const string& msg, udp::endpoint& remoteEndpoint);
+	string receiveMsg(udp::endpoint& remoteEndpoint);
 };

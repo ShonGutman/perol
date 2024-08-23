@@ -55,9 +55,21 @@ void server::startListening()
 
 void server::handleNewClient(udp::endpoint remoteEndpoint)
 {
-	cout << "New client accepted with ip " << remoteEndpoint.address() << " and port " << remoteEndpoint.port() << endl;
+	try
+	{
+		cout << "New client accepted with ip " << remoteEndpoint.address() << " and port " << remoteEndpoint.port() << endl;
 
-	sendMsg("Welcome!\n", remoteEndpoint);
+		sendMsg("Welcome!\n", remoteEndpoint);
+		receiveMsg(remoteEndpoint);
+	}
+	catch (std::exception& e)
+	{
+		cout << "Exception: " << e.what() << endl;
+	}
+	catch (...)
+	{
+		cout << "Something went terribly wrong, and I have no idea what." << endl;
+	}
 }
 
 void server::sendMsg(const string& msg, udp::endpoint& remoteEndpoint)
@@ -65,4 +77,19 @@ void server::sendMsg(const string& msg, udp::endpoint& remoteEndpoint)
 	bs::error_code ignored_error;
 	_socketServer.send_to(ba::buffer(msg),
 	remoteEndpoint, 0, ignored_error);
+}
+
+string server::receiveMsg(udp::endpoint& remoteEndpoint)
+{
+	boost::array<char, 1> recvBuffer;
+	bs::error_code error;
+
+	_socketServer.receive_from(ba::buffer(recvBuffer), remoteEndpoint, 0, error);
+
+	if (error && error != ba::error::message_size)
+		throw bs::system_error(error);
+
+	auto data = recvBuffer.data();
+	cout << "data " << data << endl;
+	return data;
 }
