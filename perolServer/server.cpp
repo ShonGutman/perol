@@ -30,27 +30,24 @@ void server::run()
 
 void server::startListening()
 {
-	for (;;)
-	{
-		// initializing client data
-		boost::array<char, 1> recvBuffer;
-		udp::endpoint remoteEndpoint;
-		bs::error_code error;
+	// initializing client data
+	char recvBuffer[1024] = { 0 };
+	udp::endpoint remoteEndpoint;
+	bs::error_code error;
 
-		cout << endl << "Listening..." << endl;
+	cout << endl << "Listening..." << endl;
 
-		// waiting for client
-		_socketServer.receive_from(ba::buffer(recvBuffer),
-			remoteEndpoint, 0, error);
+	// waiting for client
+	_socketServer.receive_from(ba::buffer(recvBuffer),
+		remoteEndpoint, 0, error);
 
-		// error while listening
-		if (error && error != ba::error::message_size)
-			throw bs::system_error(error);
+	// error while listening
+	if (error && error != ba::error::message_size)
+		throw bs::system_error(error);
 
-		// creating client thread
-		thread t_newClient(&server::handleNewClient, this, std::move(remoteEndpoint));
-		t_newClient.detach();
-	}
+	// creating client thread
+	thread t_newClient(&server::handleNewClient, this, std::move(remoteEndpoint));
+	t_newClient.detach();
 }
 
 void server::handleNewClient(udp::endpoint remoteEndpoint)
@@ -81,7 +78,7 @@ void server::sendMsg(const string& msg, udp::endpoint& remoteEndpoint)
 
 string server::receiveMsg(udp::endpoint& remoteEndpoint)
 {
-	boost::array<char, 1> recvBuffer;
+	char recvBuffer[1024] = {0};
 	bs::error_code error;
 
 	_socketServer.receive_from(ba::buffer(recvBuffer), remoteEndpoint, 0, error);
@@ -89,7 +86,6 @@ string server::receiveMsg(udp::endpoint& remoteEndpoint)
 	if (error && error != ba::error::message_size)
 		throw bs::system_error(error);
 
-	auto data = recvBuffer.data();
-	cout << "data " << data << endl;
-	return data;
+	cout << "data " << recvBuffer << endl;
+	return recvBuffer;
 }
