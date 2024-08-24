@@ -30,34 +30,47 @@ void server::run()
 
 void server::startListening()
 {
-	// initializing client data
-	char recvBuffer[1024] = { 0 };
-	udp::endpoint remoteEndpoint;
-	bs::error_code error;
+	while(true)
+	{
+		// initializing client data
+		char recvBuffer[1024] = { 0 };
+		udp::endpoint remoteEndpoint;
+		bs::error_code error;
 
-	cout << endl << "Listening..." << endl;
+		cout << endl << "Listening..." << endl;
 
-	// waiting for client
-	_socketServer.receive_from(ba::buffer(recvBuffer),
-		remoteEndpoint, 0, error);
+		// waiting for client
+		_socketServer.receive_from(ba::buffer(recvBuffer),
+			remoteEndpoint, 0, error);
 
-	// error while listening
-	if (error && error != ba::error::message_size)
-		throw bs::system_error(error);
+		// error while listening
+		if (error && error != ba::error::message_size)
+		{
+			cerr << "Error while listening: " << error.message() << endl;
+			return;
+		}
 
-	// creating client thread
-	thread t_newClient(&server::handleNewClient, this, std::move(remoteEndpoint));
-	t_newClient.detach();
+		// create new Thread to handle the msg
+		thread t_newClient(&server::handleMsg, this, std::move(remoteEndpoint));
+		t_newClient.detach();
+	}
 }
 
-void server::handleNewClient(udp::endpoint remoteEndpoint)
+void server::handleMsg(udp::endpoint remoteEndpoint)
 {
+	string clientId = getIpPortString(remoteEndpoint);
+
 	try
 	{
-		cout << "New client accepted with ip " << remoteEndpoint.address() << " and port " << remoteEndpoint.port() << endl;
-
-		sendMsg("Welcome!\n", remoteEndpoint);
-		receiveMsg(remoteEndpoint);
+		if (_clientsMap.find(clientId) == _clientsMap.end())
+		{
+			// New client
+			_clientsMap.emplace(clientId, remoteEndpoint);
+			handleNewClient(clientId);
+		}
+		else
+			// Existing client
+			handleExistingClient(clientId);
 	}
 	catch (std::exception& e)
 	{
@@ -69,23 +82,33 @@ void server::handleNewClient(udp::endpoint remoteEndpoint)
 	}
 }
 
-void server::sendMsg(const string& msg, udp::endpoint& remoteEndpoint)
+void server::handleNewClient(const string clientId)
 {
-	bs::error_code ignored_error;
-	_socketServer.send_to(ba::buffer(msg),
-	remoteEndpoint, 0, ignored_error);
+	cout << "New client accepted " << clientId << endl;
+
+	sendMsg("Welcome!\n", clientId);
 }
 
-string server::receiveMsg(udp::endpoint& remoteEndpoint)
+void server::handleExistingClient(const string clientId)
 {
-	char recvBuffer[1024] = {0};
-	bs::error_code error;
+	cout << "Existing client reached " << clientId << endl;
 
-	_socketServer.receive_from(ba::buffer(recvBuffer), remoteEndpoint, 0, error);
+	sendMsg("Good to see you again!\n", clientId);
+}
 
-	if (error && error != ba::error::message_size)
-		throw bs::system_error(error);
+void server::sendMsg(const string& msg, const string& clientId)
+{
+	if (_clientsMap.find(clientId) != _clientsMap.end())
+	{
+		bs::error_code ignored_error;
+		_socketServer.send_to(ba::buffer(msg),
+			_clientsMap[clientId], 0, ignored_error);
+	}
+	else
+		throw clientId;
+}
 
-	cout << "data " << recvBuffer << endl;
-	return recvBuffer;
+const string server::getIpPortString(const udp::endpoint& remoteEndpoint)
+{
+	return remoteEndpoint.address().to_string() + ":" + std::to_string(remoteEndpoint.port());
 }
