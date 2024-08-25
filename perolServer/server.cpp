@@ -1,5 +1,14 @@
 #include "server.h"
 
+// client messages 
+#define LOGIN "LOGIN"
+#define KA "KEEP ALIVE"
+
+// server messages
+#define SUCCEED "SUCCEED"
+#define FAILED "FAILED"
+#define RECEIVED "RECEIVED"
+
 // server commands
 #define EXIT "exit" // ends server run
 
@@ -14,6 +23,9 @@ void server::run()
 	thread t_listen(&server::startListening, this);
 	t_listen.detach();
 
+	// create thread to remove inactive clients
+	thread t_inactiveClients(&server::startListening, this);
+	t_inactiveClients.detach();
 
 	std::string input;
 	while (input != EXIT)
@@ -32,15 +44,15 @@ void server::startListening()
 {
 	while(true)
 	{
-		// initializing client data
-		char recvBuffer[1024] = { 0 };
+		// initializing msg data
+		char recvBuffer[1024] = { '\0' };
 		udp::endpoint remoteEndpoint;
 		bs::error_code error;
 
 		cout << endl << "Listening..." << endl;
 
 		// waiting for client
-		_socketServer.receive_from(ba::buffer(recvBuffer),
+		size_t size = _socketServer.receive_from(ba::buffer(recvBuffer),
 			remoteEndpoint, 0, error);
 
 		// error while listening
@@ -50,27 +62,49 @@ void server::startListening()
 			return;
 		}
 
+		// intializing msg data struct
+		receivedMsg msgData(recvBuffer, std::move(remoteEndpoint), error, size, clock::now());
+
 		// create new Thread to handle the msg
-		thread t_newClient(&server::handleMsg, this, std::move(remoteEndpoint));
+		thread t_newClient(&server::handleMsg, this, msgData);
 		t_newClient.detach();
 	}
 }
 
-void server::handleMsg(udp::endpoint remoteEndpoint)
+void server::handleMsg(receivedMsg msgData)
 {
-	string clientId = getIpPortString(remoteEndpoint);
-
 	try
 	{
-		if (_clientsMap.find(clientId) == _clientsMap.end())
+		if (msgData.msgBuffer == LOGIN)
 		{
-			// New client
-			_clientsMap.emplace(clientId, remoteEndpoint);
-			handleNewClient(clientId);
+			string clientId = getIpPortString(msgData.remoteEndpoint);
+			if (_clientsMap.find(clientId) == _clientsMap.end())
+			{
+				// add new client to client list
+				_clientsMap.emplace(clientId, client(msgData.remoteEndpoint, msgData.receiveTime));
+
+				cout << "New client accepted " << clientId << endl;
+
+				sendMsg("Welcome!\n", msgData.remoteEndpoint);
+			}
+			else
+				sendFailed(msgData.remoteEndpoint);
+		}
+		else if (msgData.msgBuffer == KA)
+		{
+			string clientId = getIpPortString(msgData.remoteEndpoint);
+			auto clientIt = _clientsMap.find(clientId);
+			if( clientIt != _clientsMap.end())
+			{
+				cout << "Existing client reached " << clientId << endl;
+
+				sendMsg(RECEIVED, msgData.remoteEndpoint);
+			}
 		}
 		else
-			// Existing client
-			handleExistingClient(clientId);
+		{
+			sendFailed(msgData.remoteEndpoint);
+		}
 	}
 	catch (std::exception& e)
 	{
@@ -82,33 +116,49 @@ void server::handleMsg(udp::endpoint remoteEndpoint)
 	}
 }
 
-void server::handleNewClient(const string clientId)
+void server::sendFailed(udp::endpoint& remoteEndPoint)
 {
-	cout << "New client accepted " << clientId << endl;
-
-	sendMsg("Welcome!\n", clientId);
-}
-
-void server::handleExistingClient(const string clientId)
-{
-	cout << "Existing client reached " << clientId << endl;
-
-	sendMsg("Good to see you again!\n", clientId);
+	sendMsg(FAILED, remoteEndPoint);
 }
 
 void server::sendMsg(const string& msg, const string& clientId)
 {
 	if (_clientsMap.find(clientId) != _clientsMap.end())
 	{
-		bs::error_code ignored_error;
-		_socketServer.send_to(ba::buffer(msg),
-			_clientsMap[clientId], 0, ignored_error);
+		sendMsg(msg, _clientsMap[clientId].socketClient);
 	}
 	else
 		throw clientId;
 }
 
+void server::sendMsg(const string& msg, udp::endpoint& remoteEndPoint)
+{
+	bs::error_code error;
+	_socketServer.send_to(ba::buffer(msg),
+		remoteEndPoint, 0, error);
+
+	// check error
+}
+
 const string server::getIpPortString(const udp::endpoint& remoteEndpoint)
 {
 	return remoteEndpoint.address().to_string() + ":" + std::to_string(remoteEndpoint.port());
+}
+
+void server::checkInactiveClients()
+{
+	while (true)
+	{
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+
+		timePoint now = clock::now();
+		for (auto& client : _clientsMap)
+		{
+			if (std::chrono::duration_cast<std::chrono::seconds>(now - client.second.lastTime).count() > 7)
+			{
+				cout << "Timed out client " << client.first << endl;
+				_clientsMap.erase(client.first);
+			}
+		}
+	}
 }
