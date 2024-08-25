@@ -24,7 +24,7 @@ void server::run()
 	t_listen.detach();
 
 	// create thread to remove inactive clients
-	thread t_inactiveClients(&server::startListening, this);
+	thread t_inactiveClients(&server::checkInactiveClients, this);
 	t_inactiveClients.detach();
 
 	std::string input;
@@ -62,8 +62,8 @@ void server::startListening()
 			return;
 		}
 
-		// intializing msg data struct
-		receivedMsg msgData(recvBuffer, std::move(remoteEndpoint), error, size, clock::now());
+		// initializing msg data struct
+		receivedMsg msgData(recvBuffer, std::move(remoteEndpoint), error, size, std::chrono::steady_clock::now());
 
 		// create new Thread to handle the msg
 		thread t_newClient(&server::handleMsg, this, msgData);
@@ -81,11 +81,11 @@ void server::handleMsg(receivedMsg msgData)
 			if (_clientsMap.find(clientId) == _clientsMap.end())
 			{
 				// add new client to client list
-				_clientsMap.emplace(clientId, client(msgData.remoteEndpoint, msgData.receiveTime));
+				_clientsMap.emplace(clientId, client(std::move(msgData.remoteEndpoint), msgData.receiveTime));
 
 				cout << "New client accepted " << clientId << endl;
 
-				sendMsg("Welcome!\n", msgData.remoteEndpoint);
+				sendMsg(SUCCEED, clientId);
 			}
 			else
 				sendFailed(msgData.remoteEndpoint);
@@ -96,9 +96,11 @@ void server::handleMsg(receivedMsg msgData)
 			auto clientIt = _clientsMap.find(clientId);
 			if( clientIt != _clientsMap.end())
 			{
+				_clientsMap.at(clientId).lastTime = msgData.receiveTime;
+
 				cout << "Existing client reached " << clientId << endl;
 
-				sendMsg(RECEIVED, msgData.remoteEndpoint);
+				sendMsg(RECEIVED, clientId);
 			}
 		}
 		else
@@ -151,13 +153,13 @@ void server::checkInactiveClients()
 	{
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 
-		timePoint now = clock::now();
-		for (auto& client : _clientsMap)
+		timePoint now = std::chrono::steady_clock::now();
+		for (auto client = _clientsMap.begin(); client != _clientsMap.end(); ++client)
 		{
-			if (std::chrono::duration_cast<std::chrono::seconds>(now - client.second.lastTime).count() > 7)
+			if (std::chrono::duration_cast<std::chrono::seconds>(now - client->second.lastTime).count() > 7)
 			{
-				cout << "Timed out client " << client.first << endl;
-				_clientsMap.erase(client.first);
+				cout << "Timed out client " << client->first << endl;
+				_clientsMap.erase(client);
 			}
 		}
 	}

@@ -11,8 +11,8 @@
 namespace ba = boost::asio;
 namespace bs = boost::system;
 
-using clock = std::chrono::steady_clock;
-using timePoint = std::chrono::time_point<clock>;
+//using clock = std::chrono::steady_clock;
+using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
 using boost::asio::ip::udp;
 
@@ -28,6 +28,8 @@ using std::unordered_map;
 struct client {
 	udp::endpoint socketClient;
 	timePoint lastTime;
+
+	client() = default;
 
 	client(udp::endpoint sock, timePoint time) : 
 		socketClient(std::move(sock)), lastTime(time) {}
