@@ -12,7 +12,6 @@
 // server commands
 #define EXIT "exit" // ends server run
 
-
 static std::mutex _coutMutex;
 static std::mutex _clientsMutex;
 
@@ -28,8 +27,8 @@ void server::run()
 	t_listen.detach();
 
 	// create thread to remove inactive clients
-	thread t_inactiveClients(&server::checkInactiveClients, this);
-	t_inactiveClients.detach();
+	//thread t_inactiveClients(&server::checkInactiveClients, this);
+	//t_inactiveClients.detach();
 
 	std::string input;
 	while (input != EXIT)
@@ -48,7 +47,7 @@ void server::startListening()
 {
 	{
 		//lock the mutex - to protect _coutMutex (shared var)
-		std::lock_guard<std::mutex> locker(_coutMutex);
+		std::lock_guard<std::mutex> lock(_coutMutex);
 		cout << endl << "Listening..." << endl;
 	}
 
@@ -67,7 +66,7 @@ void server::startListening()
 		if (error && error != ba::error::message_size)
 		{
 			//lock the mutex - to protect _coutMutex (shared var)
-			std::lock_guard<std::mutex> locker(_coutMutex);
+			std::lock_guard<std::mutex> lock(_coutMutex);
 			cerr << "Error while listening: " << error.message() << endl;
 			return;
 		}
@@ -90,16 +89,16 @@ void server::handleMsg(receivedMsg msgData)
 			string clientId = getIpPortString(msgData.remoteEndpoint);
 
 			//lock the mutex - to protect _clientsMap (shared var)
-			std::lock_guard<std::mutex> locker(_clientsMutex);
+			std::unique_lock<std::mutex> locker(_clientsMutex);
 			if (_clientsMap.find(clientId) == _clientsMap.end())
 			{
 				// add new client to client list
 				_clientsMap.emplace(clientId, client(std::move(msgData.remoteEndpoint), msgData.receiveTime));
-
+				locker.unlock();
 
 				{
 					//lock the mutex - to protect _coutMutex (shared var)
-					std::lock_guard<std::mutex> locker(_coutMutex);
+					std::lock_guard<std::mutex> lock(_coutMutex);
 					cout << "New client accepted " << clientId << endl;
 				}
 
@@ -116,13 +115,16 @@ void server::handleMsg(receivedMsg msgData)
 		{
 			string clientId = getIpPortString(msgData.remoteEndpoint);
 
+			//lock the mutex - to protect _clientsMap (shared var)
+			std::unique_lock<std::mutex> locker(_clientsMutex);
 			if(_clientsMap.find(clientId) != _clientsMap.end())
 			{
 				_clientsMap.at(clientId).lastTime = msgData.receiveTime;
+				locker.unlock();
 
 				{
 					//lock the mutex - to protect _coutMutex (shared var)
-					std::lock_guard<std::mutex> locker(_coutMutex);
+					std::lock_guard<std::mutex> lock(_coutMutex);
 					cout << "Existing client reached " << clientId << endl;
 				}
 
@@ -196,7 +198,7 @@ void server::checkInactiveClients()
 			{
 				{
 					//lock the mutex - to protect _coutMutex (shared var)
-					std::lock_guard<std::mutex> locker(_coutMutex);
+					std::lock_guard<std::mutex> lock(_coutMutex);
 					cout << "Timed out client " << client->first << endl;
 				}
 
