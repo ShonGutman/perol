@@ -3,6 +3,7 @@
 // client messages 
 #define LOGIN "LOGIN"
 #define KA "KEEP ALIVE"
+#define BYE "BYE"
 
 // server messages
 #define SUCCEED "SUCCEED"
@@ -14,6 +15,7 @@
 
 static std::mutex _coutMutex;
 static std::mutex _clientsMutex;
+static bool exitFlag = false;
 
 server::server(boost::asio::io_service& io_service) :
 	_socketServer(io_service, udp::endpoint(udp::v4(), UDP_PORT)) // initialize server socket
@@ -37,7 +39,10 @@ void server::run()
 		std::getline(std::cin, input);
 
 		if (input == EXIT)
+		{
 			cout << "Goodbye!" << endl;
+			exitFlag = true;
+		}
 		else
 			cout << "Please enter a suported command." << endl;
 	}
@@ -51,7 +56,7 @@ void server::startListening()
 		cout << endl << "Listening..." << endl;
 	}
 
-	while(true)
+	while(!exitFlag)
 	{
 		// initializing msg data
 		char recvBuffer[1024] = { '\0' };
@@ -71,12 +76,16 @@ void server::startListening()
 			return;
 		}
 
-		// initializing msg data struct
-		receivedMsg msgData(recvBuffer, std::move(remoteEndpoint), error, size, std::chrono::steady_clock::now());
+		else
+		{
+			// initializing msg data struct
+			receivedMsg msgData(recvBuffer, std::move(remoteEndpoint), error, size, std::chrono::steady_clock::now());
 
-		// create new Thread to handle the msg
-		thread t_newClient(&server::handleMsg, this, msgData);
-		t_newClient.detach();
+			// create new Thread to handle the msg
+			thread t_newClient(&server::handleMsg, this, msgData);
+			t_newClient.detach();
+		}
+
 	}
 }
 
@@ -130,6 +139,18 @@ void server::handleMsg(receivedMsg msgData)
 
 				sendMsg(RECEIVED, clientId);
 			}
+
+			else
+			{
+				sendFailed(msgData.remoteEndpoint);
+			}
+		}
+
+		else if (msgData.msgBuffer == BYE)
+		{
+			string clientId = getIpPortString(msgData.remoteEndpoint);
+			cout << "Removed client " << clientId << endl;
+			_clientsMap.erase(clientId);
 		}
 
 		else
@@ -184,7 +205,7 @@ const string server::getIpPortString(const udp::endpoint& remoteEndpoint)
 
 void server::checkInactiveClients()
 {
-	while (true)
+	while (!exitFlag)
 	{
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 
