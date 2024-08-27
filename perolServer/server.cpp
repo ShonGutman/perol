@@ -12,6 +12,10 @@
 // server commands
 #define EXIT "exit" // ends server run
 
+
+static std::mutex _coutMutex;
+static std::mutex _clientsMutex;
+
 server::server(boost::asio::io_service& io_service) :
 	_socketServer(io_service, udp::endpoint(udp::v4(), UDP_PORT)) // initialize server socket
 {
@@ -42,14 +46,18 @@ void server::run()
 
 void server::startListening()
 {
+	{
+		//lock the mutex - to protect _coutMutex (shared var)
+		std::lock_guard<std::mutex> locker(_coutMutex);
+		cout << endl << "Listening..." << endl;
+	}
+
 	while(true)
 	{
 		// initializing msg data
 		char recvBuffer[1024] = { '\0' };
 		udp::endpoint remoteEndpoint;
 		bs::error_code error;
-
-		cout << endl << "Listening..." << endl;
 
 		// waiting for client
 		size_t size = _socketServer.receive_from(ba::buffer(recvBuffer),
@@ -58,6 +66,8 @@ void server::startListening()
 		// error while listening
 		if (error && error != ba::error::message_size)
 		{
+			//lock the mutex - to protect _coutMutex (shared var)
+			std::lock_guard<std::mutex> locker(_coutMutex);
 			cerr << "Error while listening: " << error.message() << endl;
 			return;
 		}
@@ -78,31 +88,48 @@ void server::handleMsg(receivedMsg msgData)
 		if (msgData.msgBuffer == LOGIN)
 		{
 			string clientId = getIpPortString(msgData.remoteEndpoint);
+
+			//lock the mutex - to protect _clientsMap (shared var)
+			std::lock_guard<std::mutex> locker(_clientsMutex);
 			if (_clientsMap.find(clientId) == _clientsMap.end())
 			{
 				// add new client to client list
 				_clientsMap.emplace(clientId, client(std::move(msgData.remoteEndpoint), msgData.receiveTime));
 
-				cout << "New client accepted " << clientId << endl;
+
+				{
+					//lock the mutex - to protect _coutMutex (shared var)
+					std::lock_guard<std::mutex> locker(_coutMutex);
+					cout << "New client accepted " << clientId << endl;
+				}
 
 				sendMsg(SUCCEED, clientId);
 			}
+
 			else
+			{
 				sendFailed(msgData.remoteEndpoint);
+			}
 		}
+
 		else if (msgData.msgBuffer == KA)
 		{
 			string clientId = getIpPortString(msgData.remoteEndpoint);
-			auto clientIt = _clientsMap.find(clientId);
-			if( clientIt != _clientsMap.end())
+
+			if(_clientsMap.find(clientId) != _clientsMap.end())
 			{
 				_clientsMap.at(clientId).lastTime = msgData.receiveTime;
 
-				cout << "Existing client reached " << clientId << endl;
+				{
+					//lock the mutex - to protect _coutMutex (shared var)
+					std::lock_guard<std::mutex> locker(_coutMutex);
+					cout << "Existing client reached " << clientId << endl;
+				}
 
 				sendMsg(RECEIVED, clientId);
 			}
 		}
+
 		else
 		{
 			sendFailed(msgData.remoteEndpoint);
@@ -125,12 +152,18 @@ void server::sendFailed(udp::endpoint& remoteEndPoint)
 
 void server::sendMsg(const string& msg, const string& clientId)
 {
+	//lock the mutex - to protect _clientsMap (shared var)
+	std::lock_guard<std::mutex> locker(_clientsMutex);
 	if (_clientsMap.find(clientId) != _clientsMap.end())
 	{
 		sendMsg(msg, _clientsMap[clientId].socketClient);
 	}
+
 	else
+	{
+		//change later
 		throw clientId;
+	}
 }
 
 void server::sendMsg(const string& msg, udp::endpoint& remoteEndPoint)
@@ -154,12 +187,24 @@ void server::checkInactiveClients()
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 
 		timePoint now = std::chrono::steady_clock::now();
-		for (auto client = _clientsMap.begin(); client != _clientsMap.end(); ++client)
+
+		//lock the mutex - to protect _clientsMap (shared var)
+		std::lock_guard<std::mutex> locker(_clientsMutex);
+		for (auto client = _clientsMap.begin(); client != _clientsMap.end();)
 		{
 			if (std::chrono::duration_cast<std::chrono::seconds>(now - client->second.lastTime).count() > 7)
 			{
-				cout << "Timed out client " << client->first << endl;
-				_clientsMap.erase(client);
+				{
+					//lock the mutex - to protect _coutMutex (shared var)
+					std::lock_guard<std::mutex> locker(_coutMutex);
+					cout << "Timed out client " << client->first << endl;
+				}
+
+				client = _clientsMap.erase(client);
+			}
+			else
+			{
+				client++;
 			}
 		}
 	}

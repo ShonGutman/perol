@@ -3,6 +3,7 @@
 #include <boost/bind.hpp>
 #include <boost/array.hpp>
 #include <thread>
+#include<mutex>
 #include <string>
 #include <iostream>
 #include <unordered_map>
