@@ -26,11 +26,9 @@ void server::run()
 {
 	// creating listening thread
 	thread t_listen(&server::startListening, this);
-	t_listen.detach();
 
 	// create thread to remove inactive clients
 	thread t_inactiveClients(&server::checkInactiveClients, this);
-	t_inactiveClients.detach();
 
 	std::string input;
 	while (input != EXIT)
@@ -42,9 +40,15 @@ void server::run()
 		{
 			cout << "Goodbye!" << endl;
 			exitFlag = true;
+			_socketServer.close();
+			t_listen.join();
+			t_inactiveClients.join();
 		}
+
 		else
+		{
 			cout << "Please enter a suported command." << endl;
+		}
 	}
 }
 
@@ -225,6 +229,7 @@ void server::checkInactiveClients()
 
 				client = _clientsMap.erase(client);
 			}
+
 			else
 			{
 				client++;
