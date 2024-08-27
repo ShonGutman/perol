@@ -27,8 +27,8 @@ void server::run()
 	t_listen.detach();
 
 	// create thread to remove inactive clients
-	//thread t_inactiveClients(&server::checkInactiveClients, this);
-	//t_inactiveClients.detach();
+	thread t_inactiveClients(&server::checkInactiveClients, this);
+	t_inactiveClients.detach();
 
 	std::string input;
 	while (input != EXIT)
