@@ -13,6 +13,10 @@
 #define FAILED "FAILED"
 #define RECEIVED "RECEIVED"
 
+#define EXIT "EXIT"
+
+static bool exitFlag = false;
+
 client::client(ba::io_service& ioService) : 
 	_clientSock(ioService, udp::endpoint(udp::v4(), 0))
 {
@@ -36,6 +40,40 @@ void client::start()
 
 	receiveMsgServer(); // add check for SUCCEED
 
+	std::thread t_keepAlive = std::thread(&client::keepAlive, this);
+
+	std::string input;
+	while (input != EXIT)
+	{
+		// get commands from console
+		std::getline(std::cin, input);
+
+		if (input == EXIT)
+		{
+			cout << "Goodbye!" << endl;
+			exitFlag = true;
+		}
+
+		else
+		{
+			cout << "Please enter a suported command." << endl;
+		}
+	}
+
+	t_keepAlive.join();
+}
+
+void client::keepAlive()
+{
+	while (!exitFlag)
+	{
+		sendMsgServer(KA);
+
+		string serverMsg = receiveMsgServer();
+
+		if (serverMsg == RECEIVED)
+			std::this_thread::sleep_for(std::chrono::seconds(3));
+	}
 }
 
 string client::receiveMsgServer()

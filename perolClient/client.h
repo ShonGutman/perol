@@ -2,6 +2,8 @@
 #include <iostream>
 #include <boost/asio.hpp>
 #include <string>
+#include <thread>
+#include <chrono>
 
 using boost::asio::ip::udp;
 
@@ -18,6 +20,8 @@ public:
 	~client();
 	
 	void start();
+
+	void keepAlive();
 
 	string receiveMsgServer();
 	void sendMsgServer(const string& msg);
