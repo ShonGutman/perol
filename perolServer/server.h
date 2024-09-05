@@ -32,19 +32,17 @@ struct client {
 
 	client() = default;
 
-	client(udp::endpoint sock, timePoint time) : 
-		socketClient(std::move(sock)), lastTime(time) {}
+	client(udp::endpoint& sock, timePoint& time) : 
+		socketClient(std::move(sock)), lastTime(std::move(time)) {}
 };
 
 struct receivedMsg {
 	string msgBuffer;
 	udp::endpoint remoteEndpoint;
-	bs::error_code error;
-	size_t msgSize;
 	timePoint receiveTime;
 
-	receivedMsg(char buffer[1024], udp::endpoint sock, bs::error_code er, size_t size, timePoint time) :
-	msgBuffer(buffer, size), remoteEndpoint(std::move(sock)), error(er), msgSize(size), receiveTime(time) {}
+	receivedMsg(char buffer[1024], udp::endpoint& sock, timePoint& time) :
+	msgBuffer(buffer), remoteEndpoint(std::move(sock)), receiveTime(std::move(time)) {}
 };
 
 class server

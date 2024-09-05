@@ -83,10 +83,11 @@ void server::startListening()
 		else
 		{
 			// initializing msg data struct
-			receivedMsg msgData(recvBuffer, std::move(remoteEndpoint), error, size, std::chrono::steady_clock::now());
+			timePoint now = std::chrono::steady_clock::now();
+			receivedMsg msgData(recvBuffer, remoteEndpoint, now);
 
 			// create new Thread to handle the msg
-			thread t_newClient(&server::handleMsg, this, msgData);
+			thread t_newClient(&server::handleMsg, this, std::move(msgData));
 			t_newClient.detach();
 		}
 
@@ -106,7 +107,7 @@ void server::handleMsg(receivedMsg msgData)
 			if (_clientsMap.find(clientId) == _clientsMap.end())
 			{
 				// add new client to client list
-				_clientsMap.emplace(clientId, client(std::move(msgData.remoteEndpoint), msgData.receiveTime));
+				_clientsMap.emplace(clientId, client(msgData.remoteEndpoint, msgData.receiveTime));
 				locker.unlock();
 
 				{
