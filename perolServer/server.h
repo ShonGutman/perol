@@ -3,11 +3,12 @@
 #include <boost/bind.hpp>
 #include <boost/array.hpp>
 #include <thread>
-#include<mutex>
 #include <string>
 #include <iostream>
-#include <unordered_map>
 #include <chrono>
+
+#include "Client.h"
+#include "StatusHandler.h"
 
 namespace ba = boost::asio;
 namespace bs = boost::system;
@@ -22,49 +23,46 @@ using std::endl;
 using std::cerr;
 using std::string;
 using std::thread;
-using std::unordered_map;
 
 #define UDP_PORT 8200
-
-struct client {
-	udp::endpoint socketClient;
-	timePoint lastTime;
-
-	client() = default;
-
-	client(udp::endpoint& sock, timePoint& time) : 
-		socketClient(std::move(sock)), lastTime(std::move(time)) {}
-};
-
-struct receivedMsg {
-	string msgBuffer;
-	udp::endpoint remoteEndpoint;
-	timePoint receiveTime;
-
-	receivedMsg(char buffer[1024], udp::endpoint& sock, timePoint& time) :
-	msgBuffer(buffer), remoteEndpoint(std::move(sock)), receiveTime(std::move(time)) {}
-};
+#define MSG_LENGTH 1024
 
 class server
 {
 public:
 	server(ba::io_service& io_service);
 	~server() = default;
-
+	
+	/*
+	* function runs the server and initializes all threads to run
+	*/
 	void run();
 
 private:
 	udp::socket _socketServer;
-	unordered_map<std::string, client> _clientsMap;
 
+	/*
+	* function listens to input and if it recieces valid client it creates thread to handle his request
+	*/
 	void startListening();
-	void handleMsg(receivedMsg msgData);
 
-	void sendFailed(udp::endpoint& remoteEndPoint);
-	void sendMsg(const string& msg, const string& clientId);
+	/*
+	* function handels client request
+	* @param info - info of client's request
+	*/
+	void handleMsg(RequestInfo info);
+
+	/*
+	* function sends msg to a given udp endpoint
+	* @param msg - msg to be sent
+	* @param remoteEndPoint - endpoint of client to send data to
+	*/
 	void sendMsg(const string& msg, udp::endpoint& remoteEndPoint);
 
-	const string getIpPortString(const udp::endpoint& remoteEndPoint);
-
-	void checkInactiveClients();
+	/*
+	* function converts udp endpoint data into string with ip and port
+	* @param remoteEndpoint - endpoint of client
+	* @return string with ip and port
+	*/
+	string getIpPortString(const udp::endpoint& remoteEndpoint);
 };
