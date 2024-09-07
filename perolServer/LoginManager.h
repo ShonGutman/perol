@@ -37,6 +37,19 @@ public:
 	*/
 	RequestId getCurrentHandler(const string& clientId) const;
 
+	/*
+	* function inserts new client to map
+	* @param clientId - id of new client to be added
+	* @param client - Client struct with all data regarding that client
+	*/
+	void insert(const string& clientId, const Client& client);
+
+	/*
+	* function removes given client from map
+	* @param clientId - id of client to be removed
+	*/
+	void erase(const string& clientId);
+
 private:
 
 	// Private constructor to prevent external instantiation

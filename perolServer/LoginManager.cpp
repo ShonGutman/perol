@@ -32,3 +32,17 @@ RequestId LoginManager::getCurrentHandler(const string& clientId) const
 	std::lock_guard<std::mutex> locker(_clientsMutex);
 	return _clientsMap.at(clientId).handler;
 }
+
+void LoginManager::insert(const string& clientId, const Client& client)
+{
+	//lock the mutex - to protect _clientsMap (shared var)
+	std::lock_guard<std::mutex> locker(_clientsMutex);
+	_clientsMap.emplace(clientId, client);
+}
+
+void LoginManager::erase(const string& clientId)
+{
+	//lock the mutex - to protect _clientsMap (shared var)
+	std::lock_guard<std::mutex> locker(_clientsMutex);
+	_clientsMap.erase(clientId);
+}
