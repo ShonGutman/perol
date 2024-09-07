@@ -50,6 +50,20 @@ public:
 	*/
 	void erase(const string& clientId);
 
+	/*
+	* function modifies the last time that client sent msg according to new given time
+	* @param clientId - id of client to modify his last sent time msg
+	* @param newTime - the new time of the most recent msg
+	*/
+	void updateLastTime(const string& clientId, const timePoint& newTime);
+
+	/*
+	* function checks every second if there is a client which is inactive.
+	* inactive client is client that his last msg was more then 7 seconds ago.
+	* if function find such client it removes him from map
+	*/
+	void removeInactiveClients();
+
 private:
 
 	// Private constructor to prevent external instantiation

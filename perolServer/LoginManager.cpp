@@ -46,3 +46,41 @@ void LoginManager::erase(const string& clientId)
 	std::lock_guard<std::mutex> locker(_clientsMutex);
 	_clientsMap.erase(clientId);
 }
+
+void LoginManager::updateLastTime(const string& clientId, const timePoint& newTime)
+{
+	//lock the mutex - to protect _clientsMap (shared var)
+	std::lock_guard<std::mutex> locker(_clientsMutex);
+	_clientsMap.at(clientId).lastTime = newTime;
+}
+
+void LoginManager::removeInactiveClients()
+{
+	while (!exitFlag)
+	{
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+
+		timePoint now = std::chrono::steady_clock::now();
+
+		//lock the mutex - to protect _clientsMap (shared var)
+		std::lock_guard<std::mutex> locker(_clientsMutex);
+		for (auto client = _clientsMap.begin(); client != _clientsMap.end();)
+		{
+			if (std::chrono::duration_cast<std::chrono::seconds>(now - client->second.lastTime).count() > 7)
+			{
+				{
+					//lock the mutex - to protect _coutMutex (shared var)
+					std::lock_guard<std::mutex> lock(_coutMutex);
+					cout << "Timed out client " << client->first << endl;
+				}
+
+				client = _clientsMap.erase(client);
+			}
+
+			else
+			{
+				client++;
+			}
+		}
+	}
+}
