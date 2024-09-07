@@ -68,7 +68,7 @@ private:
 
 	// Private constructor to prevent external instantiation
 	// CTOR //
-	LoginManager();
+	LoginManager() = default;
 
 	std::map<string, Client> _clientsMap;
 
