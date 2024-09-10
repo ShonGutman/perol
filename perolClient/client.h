@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <boost/asio.hpp>
+#include <boost/system/system_error.hpp>
 #include <string>
 #include <thread>
 #include <chrono>
@@ -21,12 +22,15 @@ public:
 	
 	void start();
 
-	void keepAlive();
+private:
+	ba::io_service& _ioService;
+	udp::socket _clientSock;
+	udp::endpoint serverSock;
+
+	void connectServer();
 
 	string receiveMsgServer();
 	void sendMsgServer(const string& msg);
 
-private:
-	udp::socket _clientSock;
-	udp::endpoint serverSock;
+	void keepAlive();
 };

@@ -4,10 +4,21 @@ int main()
 {
 	cout << "Welcome to perol!" << endl;
 	
+	// initializing io service
 	ba::io_service ioService;
-	client p2pClient(ioService);
+	try
+	{
+		// creating client 
+		client p2pClient(ioService);
 
-	p2pClient.start();
+		// starting client
+		p2pClient.start();
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "Error: " << e.what() << endl;
+		return -1;
+	}
 
 	return 0;
 }
